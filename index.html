@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#1a73e8">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <link rel="manifest" href="manifest.json">
+  <title>Kho Chú Thắng</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+</head>
+<body>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: #f0f2f5; color: #222;
+  padding-bottom: 80px;
+}
+.header {
+  background: linear-gradient(135deg, #1a73e8, #0d47a1);
+  color: white; padding: 18px 20px;
+  position: sticky; top: 0; z-index: 100;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+  display: flex; justify-content: space-between; align-items: center;
+}
+.header h1 { font-size: 22px; font-weight: 600; }
+.header .sub { font-size: 14px; opacity: 0.85; margin-top: 2px; }
+.header-right { display: flex; align-items: center; gap: 8px; }
+.btn-logout {
+  background: rgba(255,255,255,0.15); color: white; border: 1px solid rgba(255,255,255,0.3);
+  padding: 6px 14px; border-radius: 8px; font-size: 13px; cursor: pointer;
+}
+.btn-logout:hover { background: rgba(255,255,255,0.25); }
+.user-email { font-size: 12px; opacity: 0.7; margin-right: 4px; }
+.container { max-width: 480px; margin: 0 auto; padding: 12px; }
+/* Auth */
+.auth-screen {
+  display: flex; min-height: 100vh;
+  justify-content: center; align-items: center;
+  padding: 20px;
+  background: linear-gradient(135deg, #1a73e8, #0d47a1);
+}
+.auth-screen.hide { display: none; }
+.auth-card {
+  background: white; border-radius: 16px;
+  padding: 32px 24px; width: 100%; max-width: 400px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+}
+.auth-card h1 { text-align: center; font-size: 24px; margin-bottom: 4px; color: #1a73e8; }
+.auth-card .subtitle { text-align: center; font-size: 14px; color: #666; margin-bottom: 24px; }
+.auth-card .field { margin-bottom: 14px; }
+.auth-card label { display: block; font-size: 14px; color: #555; margin-bottom: 4px; }
+.auth-card input {
+  width: 100%; padding: 12px 14px; border: 1px solid #ddd;
+  border-radius: 8px; font-size: 16px; outline: none;
+}
+.auth-card input:focus { border-color: #1a73e8; }
+.btn-auth {
+  width: 100%; padding: 14px; border: none; border-radius: 10px;
+  font-size: 16px; font-weight: 600; cursor: pointer; margin-top: 4px;
+  background: #1a73e8; color: white;
+}
+.btn-auth:hover { background: #1557b0; }
+.btn-auth:disabled { opacity: 0.6; cursor: not-allowed; }
+.auth-card .auth-toggle { text-align: center; margin-top: 14px; font-size: 14px; }
+.auth-card .auth-toggle a { color: #1a73e8; cursor: pointer; text-decoration: none; font-weight: 600; }
+.auth-error { background: #fce8e6; color: #c5221f; padding: 10px; border-radius: 8px; font-size: 14px; margin-bottom: 12px; display: none; text-align: center; }
+.auth-error.show { display: block; }
+.auth-success { background: #e6f4ea; color: #1e7e34; padding: 10px; border-radius: 8px; font-size: 14px; margin-bottom: 12px; display: none; text-align: center; }
+.auth-success.show { display: block; }
+.app-screen { display: none; }
+.app-screen.show { display: block; }
+/* Stats */
+.stats { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 12px; }
+.stat-card {
+  background: white; border-radius: 10px; padding: 14px 8px;
+  text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+}
+.stat-card .num { font-size: 24px; font-weight: 700; color: #1a73e8; }
+.stat-card .label { font-size: 13px; color: #666; margin-top: 2px; }
+.stat-card .num.danger { color: #c5221f; }
+/* Actions */
+.actions { display: flex; gap: 8px; margin-bottom: 12px; }
+.actions button {
+  flex: 1; padding: 16px; border: none; border-radius: 10px;
+  font-size: 14px; font-weight: 600; cursor: pointer; min-height: 52px;
+  transition: transform 0.1s;
+}
+.actions button:active { transform: scale(0.97); }
+.btn-primary { background: #1a73e8; color: white; }
+.btn-success { background: #34a853; color: white; }
+.btn-warning { background: #f9ab00; color: white; }
+.btn-danger { background: #d93025; color: white; }
+.btn-secondary { background: #f1f3f4; color: #222; }
+/* Search */
+.search-bar {
+  background: white; border-radius: 10px; padding: 10px 14px;
+  margin-bottom: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+  display: flex; align-items: center; gap: 8px;
+}
+.search-bar input {
+  flex: 1; border: none; outline: none; font-size: 16px; background: transparent;
+}
+/* Card */
+.item-card {
+  background: white; border-radius: 10px; padding: 16px;
+  margin-bottom: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+  cursor: pointer; min-height: 72px;
+}
+.item-card:active { background: #f5f5f5; }
+.item-card .name { font-size: 17px; font-weight: 600; margin-bottom: 4px; }
+.item-card .code { font-size: 15px; color: #1a73e8; font-weight: 500; }
+.item-card .meta {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-top: 6px; font-size: 14px; color: #555;
+}
+/* Badge */
+.badge {
+  display: inline-block; padding: 4px 12px; border-radius: 20px;
+  font-size: 12px; font-weight: 600;
+}
+.badge-ok { background: #e6f4ea; color: #1e7e34; }
+.badge-warn { background: #fce8e6; color: #c5221f; }
+.badge-info { background: #e8f0fe; color: #1a73e8; }
+/* Bottom nav */
+.bottom-nav {
+  position: fixed; bottom: 0; left: 0; right: 0;
+  background: white; display: flex;
+  border-top: 1px solid #e0e0e0; z-index: 100;
+}
+.bottom-nav button {
+  flex: 1; padding: 12px 0; border: none; background: transparent;
+  font-size: 13px; color: #555; cursor: pointer;
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  min-height: 56px;
+}
+.bottom-nav button.active { color: #1a73e8; font-weight: 600; }
+.bottom-nav .nav-icon { font-size: 22px; }
+/* Modal */
+.modal-overlay {
+  display: none; position: fixed; inset: 0;
+  background: rgba(0,0,0,0.4); z-index: 200;
+  justify-content: center; align-items: flex-end;
+}
+.modal-overlay.show { display: flex; }
+.modal {
+  background: white; border-radius: 16px 16px 0 0;
+  width: 100%; max-width: 480px; max-height: 85vh;
+  overflow-y: auto; padding: 24px 20px 28px;
+  animation: slideUp 0.25s ease-out;
+}
+@keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+.modal h2 { font-size: 20px; margin-bottom: 16px; }
+.modal .field { margin-bottom: 14px; }
+.modal label { display: block; font-size: 14px; color: #555; margin-bottom: 4px; }
+.modal input, .modal select, .modal textarea {
+  width: 100%; padding: 12px 14px; border: 1px solid #ddd;
+  border-radius: 8px; font-size: 16px; outline: none;
+}
+.modal input:focus, .modal select:focus { border-color: #1a73e8; }
+.modal textarea { resize: vertical; min-height: 60px; font-family: inherit; }
+.modal .btn-row { display: flex; gap: 8px; margin-top: 14px; }
+.modal .btn-row button {
+  flex: 1; padding: 14px; border: none; border-radius: 10px;
+  font-size: 16px; font-weight: 600; cursor: pointer; min-height: 48px;
+}
+/* Toast */
+.toast {
+  position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%);
+  background: #323232; color: white; padding: 14px 28px;
+  border-radius: 10px; font-size: 15px; z-index: 300;
+  opacity: 0; transition: opacity 0.3s; pointer-events: none; max-width: 90%; text-align: center;
+}
+.toast.show { opacity: 1; }
+.page { display: none; }
+.page.active { display: block; }
+.transaction-item {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 12px 14px; background: white; border-radius: 8px;
+  margin-bottom: 4px; font-size: 14px;
+}
+.tx-nhap { border-left: 3px solid #34a853; }
+.tx-xuat { border-left: 3px solid #d93025; }
+.empty-state { text-align: center; padding: 50px 20px; color: #999; }
+.empty-state .icon { font-size: 56px; margin-bottom: 8px; }
+.empty-state p { font-size: 15px; }
+.settings-group { background: white; border-radius: 10px; margin-bottom: 12px; overflow: hidden; }
+.settings-item {
+  padding: 16px; border-bottom: 1px solid #f0f0f0;
+  display: flex; justify-content: space-between; align-items: center;
+}
+.settings-item:last-child { border-bottom: none; }
+.settings-item .label { font-size: 15px; }
+.settings-item input[type=number] {
+  width: 100px; text-align: right; padding: 8px 10px;
+  border: 1px solid #ddd; border-radius: 6px; font-size: 15px;
+}
+.spinner {
+  display: inline-block; width: 20px; height: 20px;
+  border: 3px solid rgba(255,255,255,0.3);
+  border-top-color: white; border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+  vertical-align: middle; margin-right: 6px;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.loading-text { text-align: center; padding: 30px; color: #999; font-size: 15px; }
+input, textarea, select { font-size: 16px !important; }
+.section-title { font-size: 15px; font-weight: 600; margin: 14px 0 8px; color: #333; }
+</style>
+
+<!-- Auth -->
+<div class="auth-screen" id="authScreen">
+  <div class="auth-card">
+    <h1>📦 Kho Chú Thắng</h1>
+    <p class="subtitle">Quản lý hàng tồn kho</p>
+    <div class="auth-error" id="authError"></div>
+    <div class="auth-success" id="authSuccess"></div>
+    <div id="loginForm">
+      <div class="field"><label>Tên đăng nhập</label><input type="text" id="loginEmail" placeholder="VD: thang" autocomplete="username"></div>
+      <div class="field"><label>Mật khẩu</label><input type="password" id="loginPassword" placeholder="••••••••" autocomplete="current-password"></div>
+      <div class="field" style="display:flex;flex-direction:row;align-items:center;gap:8px;margin-bottom:4px">
+        <input type="checkbox" id="stayLoggedIn" checked style="width:18px;height:18px;cursor:pointer;accent-color:#1a73e8">
+        <label for="stayLoggedIn" style="font-size:14px;color:#555;cursor:pointer;margin:0">Ghi nhớ đăng nhập</label>
+      </div>
+      <button class="btn-auth" id="loginBtn" onclick="handleLogin()">Đăng nhập</button>
+      <div class="auth-toggle">Chưa có tài khoản? <a onclick="showSignUp()">Đăng ký</a></div>
+    </div>
+    <div id="signupForm" style="display:none;">
+      <div class="field"><label>Tên đăng nhập</label><input type="text" id="signupUsername" placeholder="VD: thang" autocomplete="username"></div>
+      <div class="field"><label>Email</label><input type="email" id="signupEmail" placeholder="email@example.com" autocomplete="email"></div>
+      <div class="field"><label>Mật khẩu</label><input type="password" id="signupPassword" placeholder="••••••••" autocomplete="new-password"></div>
+      <button class="btn-auth" id="signupBtn" onclick="handleSignUp()">Đăng ký</button>
+      <div class="auth-toggle">Đã có tài khoản? <a onclick="showLogin()">Đăng nhập</a></div>
+    </div>
+  </div>
+</div>
+
+<!-- App -->
+<div class="app-screen" id="appScreen">
+  <div class="header">
+    <div>
+      <h1>📦 Kho Chú Thắng</h1>
+      <div class="sub">Quản lý hàng tồn kho</div>
+    </div>
+    <div class="header-right"><button class="btn-logout" onclick="handleLogout()">Thoát</button></div>
+  </div>
+
+  <div class="container">
+    <!-- Dashboard -->
+    <div class="page active" id="page-dashboard">
+      <div class="stats">
+        <div class="stat-card"><div class="num" id="dashTotalItems">0</div><div class="label">Mặt hàng</div></div>
+        <div class="stat-card"><div class="num" id="dashTotalStock">0</div><div class="label">Tồn kho</div></div>
+        <div class="stat-card"><div class="num danger" id="dashLowStock">0</div><div class="label">Sắp hết</div></div>
+      </div>
+      <div class="actions">
+        <button class="btn-primary" onclick="openNhapKho()">📥 Nhập kho</button>
+        <button class="btn-success" onclick="openXuatKho()">📤 Xuất kho</button>
+        <button class="btn-warning" onclick="openAddItem()">➕ Thêm hàng</button>
+      </div>
+      <div class="section-title">Giao dịch gần đây</div>
+      <div id="recentTransactions"></div>
+    </div>
+
+    <!-- Items -->
+    <div class="page" id="page-items">
+      <div class="search-bar">
+        <span>🔍</span>
+        <input type="text" id="itemSearch" placeholder="Tìm mã hàng, tên hàng..." oninput="renderItems()">
+      </div>
+      <div id="itemList"></div>
+    </div>
+
+    <!-- Reports -->
+    <div class="page" id="page-reports">
+      <div id="reportsContent"></div>
+    </div>
+
+    <!-- Settings -->
+    <div class="page" id="page-settings">
+      <div class="settings-group">
+        <div class="settings-item">
+          <span class="label">Ngưỡng tồn kho tối thiểu</span>
+          <input type="number" id="lowStockThreshold" onchange="saveSettings()">
+        </div>
+        <div class="settings-item">
+          <span class="label">Tổng mặt hàng</span>
+          <span class="value" id="settingTotalItems">0</span>
+        </div>
+      </div>
+      <div class="data-actions" style="display:flex;gap:8px;margin-top:14px;">
+        <button onclick="exportData()" style="flex:1;padding:12px;border:1px solid #ddd;border-radius:8px;background:white;cursor:pointer;font-size:14px;">💾 Sao lưu</button>
+        <button onclick="document.getElementById('importFile').click()" style="flex:1;padding:12px;border:1px solid #ddd;border-radius:8px;background:white;cursor:pointer;font-size:14px;">📂 Nhập</button>
+        <input type="file" id="importFile" accept=".json" style="display:none" onchange="importData(event)">
+      </div>
+    </div>
+  </div>
+
+  <!-- Bottom Nav -->
+  <div class="bottom-nav">
+    <button class="active" onclick="switchPage('dashboard')"><span class="nav-icon">🏠</span>Trang chủ</button>
+    <button onclick="switchPage('items','items')"><span class="nav-icon">📋</span>Hàng hóa</button>
+    <button onclick="switchPage('reports')"><span class="nav-icon">📊</span>Báo cáo</button>
+    <button onclick="switchPage('settings')"><span class="nav-icon">⚙️</span>Cài đặt</button>
+  </div>
+</div>
+
+<!-- Modal -->
+<div class="modal-overlay" id="modalOverlay" onclick="closeModal(event)">
+  <div class="modal" id="modalContent"></div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script src="app.js"></script>
+</body>
+</html>

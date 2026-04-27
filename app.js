@@ -146,7 +146,8 @@ async function initApp() {
   switchPage('dashboard');
   state.loading = true;
   try {
-    await Promise.all([loadItems(), loadTransactions(), loadSettings()]);
+    await Promise.all([loadItems(), loadSettings()]);
+    await loadTransactions();
     renderAll();
   } catch (e) { showToast('⚠️ Lỗi tải dữ liệu'); }
   state.loading = false;
@@ -162,10 +163,12 @@ async function loadItems() {
 }
 
 async function loadTransactions() {
+  const itemIds = state.items.map(i => i.id);
+  if (itemIds.length === 0) { state.transactions = []; return; }
   const { data: tx } = await db
     .from('transactions')
-    .select('*, items!inner(user_id)')
-    .eq('items.user_id', state.user.id)
+    .select('*')
+    .in('item_id', itemIds)
     .order('transaction_date', { ascending: false })
     .order('created_at', { ascending: false })
     .limit(200);
@@ -393,7 +396,7 @@ function openAddItem(item) {
     <div class="field"><label>Mô tả</label><textarea id="itemDesc" rows="2">${desc}</textarea></div>
     <div class="field"><label>Giá bán (VNĐ)</label><input type="number" id="itemPrice" value="${price}" placeholder="0"></div>
     ${isEdit ? `<div class="field"><label>Tồn kho</label><input type="number" id="itemStock" value="${stock}"></div>` : `<div class="field"><label>Tồn kho ban đầu</label><input type="number" id="itemStock" value="0"></div>`}
-    <div class="field"><label>Tồn tối thiểu (cảnh báo)</label><input type="number" id="itemMinStock" value="${minStock}"></div>
+    <div class="field"><label>Cảnh báo khi tồn kho dưới</label><input type="number" id="itemMinStock" value="${minStock}" placeholder="VD: 5"><div style="font-size:12px;color:#999;margin-top:2px;">Hệ thống sẽ đánh dấu mặt hàng sắp hết khi tồn kho xuống dưới số này</div></div>
     <div class="btn-row">
       <button class="btn-secondary" onclick="closeModal()">Hủy</button>
       <button class="btn-primary" onclick="${saveFn}">${isEdit ? 'Lưu' : 'Thêm'}</button>
@@ -457,17 +460,24 @@ function openItemDetail(id) {
       <div style="font-size:14px;margin-bottom:4px;"><strong>⚠️ Tồn tối thiểu:</strong> ${item.min_stock}</div>
     </div>
     <div class="actions" style="margin-bottom:12px;">
-      <button class="btn-primary" onclick="openNhapKhoFor('${item.id}');closeModal()" style="font-size:13px;">📥 Nhập</button>
-      <button class="btn-success" onclick="openXuatKhoFor('${item.id}');closeModal()" style="font-size:13px;">📤 Xuất</button>
-      <button class="btn-secondary" onclick="openAddItem(state.items.find(i=>i.id==='${item.id}'));closeModal()" style="font-size:13px;">✏️ Sửa</button>
+      <button class="btn-primary" onclick="openNhapKhoFor('${item.id}')" style="font-size:13px;">📥 Nhập</button>
+      <button class="btn-success" onclick="openXuatKhoFor('${item.id}')" style="font-size:13px;">📤 Xuất</button>
+      <button class="btn-secondary" onclick="openAddItem(state.items.find(i=>i.id==='${item.id}'))" style="font-size:13px;">✏️ Sửa</button>
     </div>
     <div class="section-title">Lịch sử giao dịch</div>
     ${txHtml}
     <div class="btn-row" style="margin-top:14px;">
-      <button class="btn-danger" onclick="if(confirm('Xóa mặt hàng ${escapeHtml(item.code)}?')){deleteItem('${item.id}');closeModal();}" style="flex:1;">🗑️ Xóa hàng</button>
+      <button class="btn-danger" onclick="confirmDeleteItem('${item.id}','${escapeHtml(item.code)}')" style="flex:1;">🗑️ Xóa hàng</button>
       <button class="btn-secondary" onclick="closeModal()" style="flex:1;">Đóng</button>
     </div>
   `);
+}
+
+// ===== Delete Item Helper =====
+async function confirmDeleteItem(id, code) {
+  if (!confirm('Xóa mặt hàng ' + code + '?\nTất cả giao dịch liên quan sẽ bị xóa.')) return;
+  closeModal();
+  await deleteItem(id);
 }
 
 // ===== Stock In (Nhập kho) =====
@@ -556,9 +566,8 @@ function importData(event) {
       state.items = data.items || [];
       state.transactions = data.transactions || [];
       renderAll();
-      showToast('✅ Đã nhập dữ liệu (tạm thời)')
+      showToast('✅ Đã nhập dữ liệu (tạm thời)');
     } catch(err) { showToast('⚠️ File không hợp lệ'); }
-    reader.readAsText(file);
     event.target.value = '';
   };
   reader.readAsText(file);
